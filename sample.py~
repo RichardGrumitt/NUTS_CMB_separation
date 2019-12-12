@@ -1,0 +1,116 @@
+from dense_mass_matrix import get_step_for_trace
+import pymc3 as pm
+import numpy as np
+
+
+def sample_model(model, nsamples, ntune, accept_prob, trace_out_dir=None, start=None, progressbar=True,
+                 discard_tuned_samples=True, save_trace=False, metropolis=False):
+
+    """
+
+    Function for sampling a pymc3 model. Traces are output at sqlite databases.
+
+    Inputs
+    ------
+    model: PyMC3 model you want to sample - pymc3 model instance.
+    nsamples: Number of samples to draw - int.
+    ntune: Number of tuning steps to take - int.
+    accept_prob: Target acceptance probability for the sampler (consider 0.9 - 0.95 for difficult posteriors) - float.
+    trace_out_dir: Output directory for the trace - str.
+    start: Default is None, in which case we use ADVI initialisation, otherwise a dictionary of parameter starting
+           values - dict.
+    progressbar: Whether you want to display a progressbar during sampling - bool.
+    discard_tuned_samples: Whether to discard tuned samples (doesn't seem to work when saving traces) - bool.
+    metropolis: Whether to use MH algorithm for sampling - bool.
+
+    Outputs
+    -------
+    trace: Trace output from sampling run - pymc3.MultiTrace.
+    
+    """
+
+    with model:
+
+        if start is None:
+
+            if not metropolis:
+                trace = pm.sample(nsamples, tune=ntune, progressbar=progressbar,
+                                  nuts_kwargs=dict(target_accept=accept_prob), discard_tuned_samples=discard_tuned_samples,
+                                  init='advi+adapt_diag')
+            elif metropolis:
+                step = pm.Metropolis()
+                trace = pm.sample(nsamples, tune=ntune, progressbar=progressbar,
+                                  step=step, discard_tuned_samples=discard_tuned_samples,
+                                  init='advi+adapt_diag')
+            if save_trace:
+                pm.backends.NDArray.save_trace(trace, trace_out_dir)
+            
+        elif start is not None:
+
+            #if not metropolis:
+            trace = pm.sample(nsamples, tune=ntune, start=start, progressbar=progressbar,
+                              nuts_kwargs=dict(target_accept=accept_prob), discard_tuned_samples=discard_tuned_samples)
+            '''
+            elif metropolis:
+                print('Warning - Doing MH sampling!')
+                step = pm.Metropolis()
+                trace = pm.sample(nsamples, tune=ntune, start=start, step=step, progressbar=progressbar,
+                                  discard_tuned_samples=discard_tuned_samples)
+            '''
+            if save_trace:
+                pm.backends.NDArray.save_trace(trace, trace_out_dir)
+
+    return trace
+
+
+def sample_model_dense(model, nsamples, accept_prob, trace_out_dir=None, nstart=25, nburn=500, ntune=2000, start=None,
+                       progressbar=True, discard_tuned_samples=True, save_trace=False):
+
+    """
+
+    Function for sampling a pymc3 model, using dense mass matrix initialisation.
+
+    Inputs
+    ------
+    model: PyMC3 model you want to sample - pymc3 model instance.
+    nsamples: Number of samples to draw - int.
+    nburn: Number of samples to burn when doing main sampling - int.
+    accept_prob: Target acceptance probability for the sampler (consider 0.9 - 0.95 for difficult posteriors) - float.
+    trace_out_dir: Output directory for the trace - str.
+    start: Default is None, in which case we use ADVI initialisation, otherwise a dictionary of parameter starting
+           values - dict.
+    progressbar: Whether you want to display a progressbar during sampling - bool.
+    discard_tuned_samples: Whether to discard tuned samples (doesn't seem to work when saving traces) - bool.
+    save_trace: Whether to save the trace to file - bool.
+
+    Outputs
+    -------
+    trace: Trace output from sampling run - pymc3.MultiTrace.
+
+    """
+
+    # Here we take the nstart, nburn and ntune parameters and create a tuning schedule.
+    # Default parameters are selected to broadly follow the schedule suggested in the STAN manual, section 34.2.
+    # May need to add a warmup phase - see the exoplanet code.
+    nwindow = nstart * 2 ** np.arange(np.floor(np.log2((ntune - nburn) / nstart)))
+    nwindow = np.append(nwindow, ntune - nburn - np.sum(nwindow))
+    nwindow = nwindow.astype(int)
+
+    with model:
+        
+        burnin_trace = None
+        for steps in nwindow:
+            step = get_step_for_trace(burnin_trace, regular_window=0, target_accept=accept_prob)
+            burnin_trace = pm.sample(
+                start=start, tune=steps, draws=2, step=step, progressbar=False,
+                compute_convergence_checks=False, discard_tuned_samples=False)
+            start = [t[-1] for t in list(burnin_trace._straces.values())]
+
+        step = get_step_for_trace(burnin_trace, regular_window=0, target_accept=accept_prob)
+        trace = pm.sample(nsamples, tune=nburn, progressbar=progressbar, trace=None,
+                          step=step, start=start, discard_tuned_samples=discard_tuned_samples)
+        
+        if save_trace:
+            pm.backends.ndarray.save_trace(trace, trace_out_dir, overwrite=True)
+        
+    return trace

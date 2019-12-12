@@ -1,0 +1,141 @@
+import numpy as np
+import healpy as hp
+from astropy.stats import mad_std
+
+
+def amp_residuals(q_map_file, u_map_file, input_map_file, param_name,
+                  out_dir, out_prefix):
+
+    q_map = hp.read_map(q_map_file)
+    u_map = hp.read_map(u_map_file)
+    in_map = hp.read_map(input_map_file, field=(1, 2))
+    q_resid = q_map - in_map[0]
+    u_resid = u_map - in_map[1]
+    q_mean = np.mean(q_resid)
+    u_mean = np.mean(u_resid)
+    q_std = mad_std(q_resid)
+    u_std = mad_std(u_resid)
+    
+    hp.write_map(f'{out_dir}{out_prefix}_Q_{param_name}_residuals.fits', q_resid, overwrite=True)
+    hp.write_map(f'{out_dir}{out_prefix}_U_{param_name}_residuals.fits', u_resid, overwrite=True)
+    print(f'Residual mean for Q {param_name} = {q_mean}')
+    print(f'Residual mean for U {param_name} = {u_mean}')
+    print(f'Residual std for Q {param_name} = {q_std}')
+    print(f'Residual std for U {param_name} = {u_std}')
+    
+    return q_resid, u_resid
+    
+
+def spectral_residuals(component_map_file, input_map_file, param_name, out_dir, out_prefix):
+
+    comp_map = hp.read_map(component_map_file)
+    in_map = hp.read_map(input_map_file)
+    resid = comp_map - in_map
+    resid_mean = np.mean(resid)
+    resid_std = mad_std(resid)
+    
+    hp.write_map(f'{out_dir}{out_prefix}_{param_name}_residuals.fits', resid, overwrite=True)
+    print(f'Residual mean for {param_name} = {resid_mean}')
+    print(f'Residual std for {param_name} = {resid_std}')
+    
+    return resid
+
+
+# LiteBIRD only
+print('LiteBIRD only')
+q_map_files = ['/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_Q_cmb_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_Q_synch_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_Q_dust_amp_mu_map.fits']
+u_map_files = ['/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_U_cmb_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_U_synch_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_U_dust_amp_mu_map.fits']
+input_files = ['/users/grumitt/nuts_regions/initial_parameters/cmb_amp_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/synch_amp_nside_64_40GHz.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_amp_nside_64_402GHz.fits']
+param_names = ['cmb_amp', 'synch_amp', 'dust_amp']
+
+for i in range(len(q_map_files)):
+
+    amp_residuals(q_map_files[i], u_map_files[i], input_files[i], param_names[i],
+                  '/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/',
+                  'litebird')
+
+spectral_files = ['/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_synch_beta_mu_map.fits',
+                  '/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_dust_beta_mu_map.fits',
+                  '/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/litebird_dust_T_mu_map.fits']
+input_files = ['/users/grumitt/nuts_regions/initial_parameters/synch_beta_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_beta_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_temp_nside_64.fits']
+param_names = ['synch_beta', 'dust_beta', 'dust_T']
+
+for i in range(len(spectral_files)):
+
+    spectral_residuals(spectral_files[i], input_files[i], param_names[i],
+                       '/users/grumitt/nuts_regions/component_maps/litebird_synch0_mbb_nside64/',
+                       'litebird')
+
+# C-BASS, LiteBIRD constant spectral
+print('C-BASS, LiteBIRD, constant spectral')
+q_map_files = ['/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_Q_cmb_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_Q_synch_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_Q_dust_amp_mu_map.fits']
+u_map_files = ['/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_U_cmb_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_U_synch_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_U_dust_amp_mu_map.fits']
+input_files = ['/users/grumitt/nuts_regions/initial_parameters/cmb_amp_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/synch_amp_nside_64_5GHz.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_amp_nside_64_402GHz.fits']
+param_names = ['cmb_amp', 'synch_amp', 'dust_amp']
+
+for i in range(len(q_map_files)):
+
+    amp_residuals(q_map_files[i], u_map_files[i], input_files[i], param_names[i],
+                  '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/',
+                  'cbass_litebird')
+
+spectral_files = ['/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_synch_beta_mu_map.fits',
+                  '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_dust_beta_mu_map.fits',
+                  '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_dust_T_mu_map.fits']
+input_files = ['/users/grumitt/nuts_regions/initial_parameters/synch_beta_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_beta_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_temp_nside_64.fits']
+param_names = ['synch_beta', 'dust_beta', 'dust_T']
+
+for i in range(len(spectral_files)):
+
+    spectral_residuals(spectral_files[i], input_files[i], param_names[i],
+                       '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/',
+                       'cbass_litebird')
+
+# C-BASS, LiteBIRD hierarchical
+print('C-BASS, LiteBIRD, hierarchical')
+q_map_files = ['/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_Q_cmb_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_Q_synch_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_Q_dust_amp_mu_map.fits']
+u_map_files = ['/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_U_cmb_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_U_synch_amp_mu_map.fits',
+               '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_U_dust_amp_mu_map.fits']
+input_files = ['/users/grumitt/nuts_regions/initial_parameters/cmb_amp_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/synch_amp_nside_64_5GHz.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_amp_nside_64_402GHz.fits']
+param_names = ['cmb_amp', 'synch_amp', 'dust_amp']
+
+for i in range(len(q_map_files)):
+
+    amp_residuals(q_map_files[i], u_map_files[i], input_files[i], param_names[i],
+                  '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/',
+                  'cbass_litebird')
+
+spectral_files = ['/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_synch_beta_mu_map.fits',
+                  '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_dust_beta_mu_map.fits',
+                  '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_dust_temp_mu_map.fits']
+input_files = ['/users/grumitt/nuts_regions/initial_parameters/synch_beta_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_beta_nside_64.fits',
+               '/users/grumitt/nuts_regions/initial_parameters/dust_temp_nside_64.fits']
+param_names = ['synch_beta', 'dust_beta', 'dust_temp']
+
+for i in range(len(spectral_files)):
+
+    spectral_residuals(spectral_files[i], input_files[i], param_names[i],
+                       '/users/grumitt/nuts_regions/component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/',
+                       'cbass_litebird')

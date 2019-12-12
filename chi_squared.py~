@@ -1,0 +1,181 @@
+import numpy as np
+import healpy as hp
+from numpy_diffuse_models import *
+
+
+def chi_squared(data_map_list, data_cov_list, freq, map_field, out_filename,
+                synch_model='power_law', dust_model='modified_blackbody', synch_nu0=5.0, dust_nu0=402.0,
+                synch_amp=None, synch_beta=None, synch_curve=None, dust_amp=None, dust_beta=None,
+                dust_temp=None, cmb_amp=None):
+
+    """
+
+    Function for computing chi-squared maps from a given run.
+    NOTE: Although this seems to calculate a reduced chi-squared, it isn't actually. The actual
+    number of dof in a Bayesian model is complicated somewhat by the use of priors, hyper-parameters
+    etc. All that matters is that we have some value that we can threshold when it comes to 
+    masking though, so this is ok. The absolute value of chi_squared is not important!
+
+    Inputs
+    ------
+    data_map_list: List of input maps used in component separation - list.
+    data_cov_list: List of associated covariance maps - list.
+    freq: Frequencies of maps - numpy.ndarray.
+    map_field: Map field to read in for inputs - int.
+    out_filename: Output filename for the chi_squared map - str.
+    synch_model: Synchrotron model name - str.
+    dust_model: Dust model name - str.
+    synch_nu0: Synchtron reference frequency - float.
+    dust_nu0: Dust reference frequency - float.
+    synch_amp: Synchrotron amplitude map - numpy.ndarray.
+    synch_beta: Synchtron spectral index map - numpy.ndarray.
+    synch_curve: Synchrotron spectral curvature map - numpy.ndarray.
+    dust_amp: Dust amplitude map - numpy.ndarray.
+    dust_beta: Dust spectral index map - numpy.ndarray.
+    dust_temp: Dust temperature map - numpy.ndarray.
+    cmb_amp: CMB amplitude map - numpy.ndarray.
+
+    Outputs
+    -------
+    chi_squared: chi_squared map - numpy.ndarray. 
+
+    """
+
+    chi_squared = []
+    
+    for i in range(len(data_map_list)):
+
+        data = hp.read_map(data_map_list[i], field=map_field)
+        cov = hp.read_map(data_cov_list[i], field=map_field)
+        nu = freq[i]
+
+        synch = Synchrotron(Model=synch_model, Nu=nu, Amp=synch_amp, Nu_0=synch_nu0,
+                            Spectral_Index=synch_beta, Spectral_Curvature=synch_curve)
+        dust = Thermal_Dust(Model=dust_model, Nu=nu, Amp=dust_amp, Nu_0=dust_nu0,
+                            Spectral_Index=dust_beta, Dust_Temp=dust_temp)
+        cmb = CMB(Model='cmb', Nu=nu, Acmb=cmb_amp)
+        model_signal = synch.signal() + dust.signal() + cmb.signal()
+        
+        chi_squared.append((data - model_signal)**2 / cov)
+
+    chi_squared = np.array(chi_squared)
+    chi_squared = np.sum(chi_squared, axis=0)
+
+    hp.write_map(out_filename, chi_squared, overwrite=True)
+
+    return chi_squared
+
+
+# Hierarchical model ...
+
+data_map_list = ["/users/grumitt/CBASS/sim_sky/PySM_public/r_forecasts/cbass/cbass_noise1_nu0005p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0040p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0050p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0060p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0068p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0078p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0089p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0100p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0119p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0140p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0166p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0195p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0235p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0280p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0337p00GHz_total_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_noise1_nu0402p00GHz_total_nside0064.fits"]
+
+data_cov_list = ["/users/grumitt/CBASS/sim_sky/PySM_public/r_forecasts/cbass/cbass_nu0005p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0040p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0050p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0060p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0068p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0078p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0089p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0100p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0119p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0140p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0166p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0195p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0235p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0280p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0337p00GHz_cov_nside0064.fits",
+                 "/mnt/elephant/grumitt/sim_sky/PySM_public/r_forecasts/litebird/litebird_nu0402p00GHz_cov_nside0064.fits"]
+
+freq = np.array([5.0, 40.0, 50.0, 60.0, 68.0, 78.0, 89.0, 100.0, 119.0, 140.0, 166.0, 195.0, 235.0, 280.0, 337.0, 402.0])
+
+synch_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_Q_synch_amp_mu_map.fits')
+synch_beta = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_synch_beta_mu_map.fits')
+dust_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_Q_dust_amp_mu_map.fits')
+dust_beta = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_dust_beta_mu_map.fits')
+dust_temp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_dust_temp_mu_map.fits')
+cmb_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_Q_cmb_amp_mu_map.fits')
+
+chi_squared(data_map_list, data_cov_list, freq, 1,
+            './component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_Q_chi_squared.fits',
+            synch_nu0=5.0, dust_nu0=402.0, synch_amp=synch_amp, synch_beta=synch_beta, dust_amp=dust_amp,
+            dust_beta=dust_beta, dust_temp=dust_temp, cmb_amp=cmb_amp)
+
+synch_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_U_synch_amp_mu_map.fits')
+synch_beta = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_synch_beta_mu_map.fits')
+dust_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_U_dust_amp_mu_map.fits')
+dust_beta = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_dust_beta_mu_map.fits')
+dust_temp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_dust_temp_mu_map.fits')
+cmb_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_U_cmb_amp_mu_map.fits')
+
+chi_squared(data_map_list, data_cov_list, freq, 2,
+            './component_maps/cbass_litebird_synch0_mbb_nside64/hierarchical/cbass_litebird_U_chi_squared.fits',
+            synch_nu0=5.0, dust_nu0=402.0, synch_amp=synch_amp, synch_beta=synch_beta, dust_amp=dust_amp,
+            dust_beta=dust_beta, dust_temp=dust_temp, cmb_amp=cmb_amp)
+
+# Const spectral with C-BASS and LiteBIRD ...
+
+synch_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_Q_synch_amp_mu_map.fits')
+synch_beta = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_synch_beta_mu_map.fits')
+dust_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_Q_dust_amp_mu_map.fits')
+dust_beta = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_dust_beta_mu_map.fits')
+dust_temp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_dust_T_mu_map.fits')
+cmb_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_Q_cmb_amp_mu_map.fits')
+
+chi_squared(data_map_list, data_cov_list, freq, 1, 
+            './component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_Q_chi_squared.fits',
+            synch_nu0=5.0, dust_nu0=402.0, synch_amp=synch_amp, synch_beta=synch_beta, dust_amp=dust_amp,
+            dust_beta=dust_beta, dust_temp=dust_temp, cmb_amp=cmb_amp)
+
+synch_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_U_synch_amp_mu_map.fits')
+synch_beta = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_synch_beta_mu_map.fits')
+dust_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_U_dust_amp_mu_map.fits')
+dust_beta = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_dust_beta_mu_map.fits')
+dust_temp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_dust_T_mu_map.fits')
+cmb_amp = hp.read_map('./component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_U_cmb_amp_mu_map.fits')
+
+chi_squared(data_map_list, data_cov_list, freq, 2,
+            './component_maps/cbass_litebird_synch0_mbb_nside64/const_spectral/cbass_litebird_U_chi_squared.fits',
+            synch_nu0=5.0, dust_nu0=402.0, synch_amp=synch_amp, synch_beta=synch_beta, dust_amp=dust_amp,
+            dust_beta=dust_beta, dust_temp=dust_temp, cmb_amp=cmb_amp)
+
+# LiteBIRD only
+
+synch_amp = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_Q_synch_amp_mu_map.fits')
+synch_beta = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_synch_beta_mu_map.fits')
+dust_amp = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_Q_dust_amp_mu_map.fits')
+dust_beta = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_dust_beta_mu_map.fits')
+dust_temp = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_dust_T_mu_map.fits')
+cmb_amp = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_Q_cmb_amp_mu_map.fits')
+
+chi_squared(data_map_list, data_cov_list, freq, 1,
+            './component_maps/litebird_synch0_mbb_nside64/litebird_Q_chi_squared.fits',
+            synch_nu0=5.0, dust_nu0=402.0, synch_amp=synch_amp, synch_beta=synch_beta, dust_amp=dust_amp,
+            dust_beta=dust_beta, dust_temp=dust_temp, cmb_amp=cmb_amp)
+
+synch_amp = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_U_synch_amp_mu_map.fits')
+synch_beta = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_synch_beta_mu_map.fits')
+dust_amp = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_U_dust_amp_mu_map.fits')
+dust_beta = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_dust_beta_mu_map.fits')
+dust_temp = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_dust_T_mu_map.fits')
+cmb_amp = hp.read_map('./component_maps/litebird_synch0_mbb_nside64/litebird_U_cmb_amp_mu_map.fits')
+
+chi_squared(data_map_list, data_cov_list, freq, 2,
+            './component_maps/litebird_synch0_mbb_nside64/litebird_U_chi_squared.fits',
+            synch_nu0=5.0, dust_nu0=402.0, synch_amp=synch_amp, synch_beta=synch_beta, dust_amp=dust_amp,
+            dust_beta=dust_beta, dust_temp=dust_temp, cmb_amp=cmb_amp)

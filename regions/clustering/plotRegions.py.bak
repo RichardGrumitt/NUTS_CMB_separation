@@ -1,0 +1,70 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import healpy as h
+from cbasspy import clusteringCode as cc
+import ConfigParser
+import sys
+plt.rc('font', family='serif')
+plt.rc('font', family='serif')
+plt.rc('mathtext',fontset='cm',rm='serif')
+
+fileName = sys.argv[1] 
+
+def plotRegions(fileName):
+    # Read in data
+    regions = h.read_map(fileName)
+    regions_unseen = h.mollview(regions,return_projected_map=True)
+    regions[regions==h.UNSEEN] = 0.
+    regions_map = h.mollview(regions,return_projected_map=True)
+    #N = len(np.unique(regions))+1
+    N = np.unique(regions)
+    plt.close('all')
+    # Color map
+    cmap = plt.get_cmap('gist_ncar')
+    cmap.set_under('w')
+    cmap.set_bad('w')
+    # Make figure
+    fig = plt.figure(figsize=[23/2.54,13/2.54])
+    ax = plt.gca()
+    ax.imshow(regions_unseen,origin='lower',cmap=cmap)
+    ax.contour(regions_map,N,colors='k')
+    ax.axis('off')
+    fig.subplots_adjust(left=0.01,bottom=0.02,right=0.93,top=0.98)
+    cax = fig.add_axes([0.935, 0.1, 0.02, 0.8])
+    cb1 = mpl.colorbar.ColorbarBase(cax, cmap=cmap,
+				    norm=mpl.colors.Normalize(vmin=np.min(N),vmax=np.max(N)),
+				    orientation='vertical')
+    # Plot text
+    Nside = h.get_nside(regions)
+    Npix = h.nside2npix(Nside)
+    Ipix = np.arange(Npix)
+    for ii in np.unique(regions[np.where((regions!=h.UNSEEN)&(regions!=0.))]):
+        print(ii)
+        idx = np.where(regions==ii)[0]
+        vecs = h.pix2vec(Nside,idx)
+        centroid_vec = np.mean(vecs,1)
+        pixel_distances = h.rotator.angdist(centroid_vec,vecs)
+        arg_min = np.argmin(pixel_distances)
+        centroid_pix = Ipix[idx][arg_min]
+        empty_map = np.zeros(Npix)
+        empty_map[centroid_pix] = 1.
+        empty_image = h.mollview(empty_map,fig=2,return_projected_map=True)
+        var_coord = np.max(np.var(np.argwhere(empty_image==np.max(empty_image)),0))
+        # Capture regions that span oposite sides of the map
+        if var_coord<20:
+            median_coord = np.mean(np.argwhere(empty_image==np.max(empty_image)),0)
+        else:
+            print('Large variance')
+            median_coord = np.argwhere(empty_image==np.max(empty_image))[0]
+        TEXT = ax.text(median_coord[1],median_coord[0],int(ii),color='w',fontsize=10,weight='bold',
+                       verticalalignment='center',horizontalalignment='center')
+        TEXT.set_bbox(dict(facecolor='grey', alpha=0.5, edgecolor='grey',pad=0.1))
+    #
+    plt.close(2)
+    return fig
+
+
+
+fig = plotRegions(fileName)
+plt.savefig('labelled_image_{0}.pdf'.format(fileName[0:-5]))

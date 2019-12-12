@@ -1,0 +1,46 @@
+import sys
+sys.path.insert(0, '/users/grumitt/CBASS/cbass_analysis/')
+import numpy as np
+import matplotlib.pyplot as plt
+import healpy as h
+from cbasspy import clusteringCode as cc
+import ConfigParser
+
+if __name__ == "__main__":
+    paramFile = sys.argv[1] #'cluster_options_cbaHasWma.ini'
+    config = ConfigParser.ConfigParser()
+    config.read(paramFile)
+    map1_dir = config.get('inputOptions', 'map1_dir')
+    map2_dir = config.get('inputOptions', 'map2_dir')
+    map3_dir = config.get('inputOptions', 'map3_dir')
+    map4_dir = config.get('inputOptions', 'map4_dir')
+    map1_name = config.get('inputOptions', 'map1_name')
+    map2_name = config.get('inputOptions', 'map2_name')
+    map3_name = config.get('inputOptions', 'map3_name')
+    map4_name = config.get('inputOptions', 'map4_name')
+    freq1 = config.getfloat('inputOptions', 'freq1')
+    freq2 = config.getfloat('inputOptions', 'freq2')
+    freq3 = config.getfloat('inputOptions', 'freq3')
+    freq4 = config.getfloat('inputOptions', 'freq4')
+    offset1 = config.getfloat('inputOptions', 'offset1')
+    offset2 = config.getfloat('inputOptions', 'offset2')
+    offset3 = config.getfloat('inputOptions', 'offset3')
+    offset4 = config.getfloat('inputOptions', 'offset4')
+    meanshift_min_bin_freq = config.getfloat('inputOptions','meanshift_min_bin_freq')
+    meanshift_bandwidth = config.getfloat('inputOptions','meanshift_bandwidth')
+    vec_divide_factor = config.getfloat('inputOptions','vec_divide_factor')
+    do_meanshift = config.getboolean('inputOptions','do_meanshift')
+    meanshift_out_name = config.get('outputOptions','meanshift_out_name')
+    # Meanshift clustering
+    if do_meanshift==True:
+        beta12 = cc.compute_naive_betas(map1_dir+'/'+map1_name,map2_dir+'/'+map2_name,freq1,freq2,
+                                        offset1=offset3,offset2=offset2,make_P_from_inputs=True)
+        beta34 = cc.compute_naive_betas(map3_dir+'/'+map3_name,map4_dir+'/'+map4_name,freq3,freq4,
+                                        offset1=offset3,offset2=offset4,make_P_from_inputs=True)
+        Nside = h.get_nside(beta12)
+        vec = cc.compute_pixel_vectors(Nside)/vec_divide_factor
+        goodIdx = np.where((beta12!=h.UNSEEN)&(beta34!=h.UNSEEN)&(~np.isnan(beta12))&(~np.isnan(beta34))&\
+                               (~np.isinf(beta12))&(~np.isinf(beta34)))
+        labels_map = cc.find_meanshift_clusters(beta12,beta34,vec,goodIdx,
+                                                bandwidth=meanshift_bandwidth,min_bin_freq=meanshift_min_bin_freq)
+        h.write_map(meanshift_out_name,labels_map,overwrite=True)
